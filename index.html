@@ -296,6 +296,69 @@
   .chip.good { background: var(--good-bg); color: var(--good); }
   .chip.bad { background: var(--bad-bg); color: var(--bad); }
 
+  details.weights {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-bottom: 18px;
+    box-shadow: var(--shadow);
+  }
+  details.weights summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 12px 16px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  details.weights summary::-webkit-details-marker { display: none; }
+  details.weights summary::before {
+    content: "▸";
+    font-size: 0.75rem;
+    transition: transform 0.15s ease;
+    color: var(--accent-strong);
+  }
+  details.weights[open] summary::before { transform: rotate(90deg); }
+  details.weights summary:hover { color: var(--ink); }
+  details.weights summary .sub { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .weights-body {
+    padding: 4px 16px 18px;
+    border-top: 1px solid var(--line);
+  }
+  .weight-group { margin-top: 14px; }
+  .weight-group:first-child { margin-top: 14px; }
+  .weight-group h4 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 8px;
+  }
+  .weight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px 20px;
+  }
+  .weight-item { display: flex; flex-direction: column; gap: 4px; }
+  .weight-item .wlabel {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 0.78rem; color: var(--ink-muted);
+  }
+  .weight-item .wlabel .wval {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600; color: var(--accent-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .weight-item input[type="range"] { accent-color: var(--accent); width: 100%; }
+
   .empty-state {
     text-align: center;
     color: var(--ink-faint);
@@ -389,6 +452,47 @@
         <input type="text" id="searchInput" placeholder="e.g. Golf, Passat, A4…">
       </div>
     </div>
+
+    <details class="weights" id="weightsPanel">
+      <summary>Scoring weights <span class="sub">— tune how price discount, fuel type, mileage and known corrosion issues combine into the Deal Score</span></summary>
+      <div class="weights-body">
+        <div class="weight-group">
+          <h4>Fuel type weight</h4>
+          <div class="weight-grid" id="fuelWeightGrid"></div>
+        </div>
+        <div class="weight-group">
+          <h4>Mileage debuff</h4>
+          <div class="weight-grid">
+            <div class="weight-item">
+              <div class="wlabel"><span>Diesel threshold</span><span class="wval" id="valDieselThreshold">150,000 km</span></div>
+              <input type="range" id="dieselThreshold" min="0" max="250000" step="10000" value="150000">
+            </div>
+            <div class="weight-item">
+              <div class="wlabel"><span>Other fuels threshold</span><span class="wval" id="valOtherThreshold">100,000 km</span></div>
+              <input type="range" id="otherThreshold" min="0" max="250000" step="10000" value="100000">
+            </div>
+            <div class="weight-item">
+              <div class="wlabel"><span>Debuff rate / 100k km</span><span class="wval" id="valMileageRate">0.10</span></div>
+              <input type="range" id="mileageRate" min="0" max="0.3" step="0.01" value="0.1">
+            </div>
+            <div class="weight-item">
+              <div class="wlabel"><span>Mileage importance</span><span class="wval" id="valMileageImportance">100%</span></div>
+              <input type="range" id="mileageImportance" min="0" max="100" step="5" value="100">
+            </div>
+          </div>
+        </div>
+        <div class="weight-group">
+          <h4>Corrosion / reliability rules</h4>
+          <div class="weight-grid">
+            <div class="weight-item" style="grid-column: 1 / -1;">
+              <div class="wlabel"><span>Corrosion importance — applies known rules (Mazda &lt;2014 ×0.5, VW Passat B6 ×0.5)</span><span class="wval" id="valCorrosionImportance">100%</span></div>
+              <input type="range" id="corrosionImportance" min="0" max="100" step="5" value="100">
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
     <div class="summary-row" id="dealsSummary"></div>
     <div class="table-wrap">
       <table>
@@ -401,6 +505,7 @@
             <th class="num">Price</th>
             <th class="num">Group avg.</th>
             <th class="num">Below avg.</th>
+            <th class="num">Deal Score</th>
           </tr>
         </thead>
         <tbody id="dealsBody"></tbody>
@@ -438,6 +543,47 @@ const LISTINGS = [{"id":"58026114","brand":"alfa-romeo","model":"giulietta","mod
 
 const FUEL_LABEL = {petrol:"Petrol", diesel:"Diesel", hybrid:"Hybrid", electric:"Electric", gas:"LPG"};
 const MIN_BUCKET = 3;
+
+const WEIGHTS = {
+  fuel: { diesel: 0.9, petrol: 0.85, gas: 0.75, hybrid: 0.7, electric: 0.6 },
+  dieselThreshold: 150000,
+  otherThreshold: 100000,
+  mileageRate: 0.1,
+  mileageImportance: 1,
+  corrosionImportance: 1
+};
+const CORROSION_RULES = [
+  { brand: "mazda", yearMax: 2013, multiplier: 0.5, label: "Mazda <2014" },
+  { brand: "volkswagen", model: "passat", yearMin: 2005, yearMax: 2010, multiplier: 0.5, label: "Passat B6" }
+];
+
+function fuelWeightFor(l) { return WEIGHTS.fuel[l.fuel] ?? 0.75; }
+
+function mileageWeightFor(l) {
+  const threshold = l.fuel === "diesel" ? WEIGHTS.dieselThreshold : WEIGHTS.otherThreshold;
+  let raw = 1;
+  if (l.mileageKm > threshold) {
+    raw = 1 - WEIGHTS.mileageRate * ((l.mileageKm - threshold) / 100000);
+  }
+  raw = Math.max(0, raw);
+  return 1 - WEIGHTS.mileageImportance * (1 - raw);
+}
+
+function corrosionMultiplierFor(l) {
+  let mult = 1;
+  for (const r of CORROSION_RULES) {
+    if (r.brand && r.brand !== l.brand) continue;
+    if (r.model && r.model !== l.model) continue;
+    if (r.yearMin && l.year < r.yearMin) continue;
+    if (r.yearMax && l.year > r.yearMax) continue;
+    mult *= r.multiplier;
+  }
+  return 1 - WEIGHTS.corrosionImportance * (1 - mult);
+}
+
+function dealScoreFor(l, pctBelow) {
+  return pctBelow * fuelWeightFor(l) * mileageWeightFor(l) * corrosionMultiplierFor(l);
+}
 
 function fmtEur(n){ return "€" + Math.round(n).toLocaleString("en-US"); }
 function fmtKm(n){ return Math.round(n).toLocaleString("en-US") + " km"; }
@@ -581,6 +727,43 @@ const searchInput = document.getElementById("searchInput");
 
 [dealsBrand, thresholdSlider, searchInput].forEach(el => el.addEventListener("input", renderDeals));
 
+// --- Scoring weight sliders ---
+const fuelWeightGrid = document.getElementById("fuelWeightGrid");
+const fuelsPresent = [...new Set(LISTINGS.map(l => l.fuel))];
+const fuelOrder = ["diesel", "petrol", "hybrid", "electric", "gas"].filter(f => fuelsPresent.includes(f));
+for (const f of fuelOrder) {
+  const defVal = WEIGHTS.fuel[f] ?? 0.75;
+  const item = document.createElement("div");
+  item.className = "weight-item";
+  item.innerHTML = `
+    <div class="wlabel"><span>${FUEL_LABEL[f] || f}</span><span class="wval" id="valFuel_${f}">${defVal.toFixed(2)}</span></div>
+    <input type="range" min="0" max="1" step="0.05" value="${defVal}">
+  `;
+  fuelWeightGrid.appendChild(item);
+  item.querySelector("input").addEventListener("input", (e) => {
+    const v = +e.target.value;
+    WEIGHTS.fuel[f] = v;
+    document.getElementById(`valFuel_${f}`).textContent = v.toFixed(2);
+    renderDeals();
+  });
+}
+
+function bindWeightSlider(id, valId, onChange, fmt) {
+  const el = document.getElementById(id);
+  const val = document.getElementById(valId);
+  el.addEventListener("input", () => {
+    const v = +el.value;
+    onChange(v);
+    val.textContent = fmt(v);
+    renderDeals();
+  });
+}
+bindWeightSlider("dieselThreshold", "valDieselThreshold", v => WEIGHTS.dieselThreshold = v, v => v.toLocaleString("en-US") + " km");
+bindWeightSlider("otherThreshold", "valOtherThreshold", v => WEIGHTS.otherThreshold = v, v => v.toLocaleString("en-US") + " km");
+bindWeightSlider("mileageRate", "valMileageRate", v => WEIGHTS.mileageRate = v, v => v.toFixed(2));
+bindWeightSlider("mileageImportance", "valMileageImportance", v => WEIGHTS.mileageImportance = v / 100, v => v + "%");
+bindWeightSlider("corrosionImportance", "valCorrosionImportance", v => WEIGHTS.corrosionImportance = v / 100, v => v + "%");
+
 function renderDeals() {
   const brandFilter = dealsBrand.value;
   const threshold = +thresholdSlider.value;
@@ -596,9 +779,10 @@ function renderDeals() {
     const avg = b.sum / b.count;
     const pctBelow = (avg - l.priceEur) / avg * 100;
     if (pctBelow < threshold) continue;
-    matches.push({ l, avg, count: b.count, pctBelow });
+    const dealScore = dealScoreFor(l, pctBelow);
+    matches.push({ l, avg, count: b.count, pctBelow, dealScore });
   }
-  matches.sort((a, b) => b.pctBelow - a.pctBelow);
+  matches.sort((a, b) => b.dealScore - a.dealScore);
 
   const summary = document.getElementById("dealsSummary");
   const body = document.getElementById("dealsBody");
@@ -612,17 +796,19 @@ function renderDeals() {
   }
   empty.classList.add("hidden");
 
-  const avgDiscount = matches.reduce((a, m) => a + m.pctBelow, 0) / matches.length;
+  const avgScore = matches.reduce((a, m) => a + m.dealScore, 0) / matches.length;
   const best = matches[0];
   summary.innerHTML = `
     <div class="stat"><div class="stat-label">Listings found</div><div class="stat-value">${matches.length}</div></div>
-    <div class="stat"><div class="stat-label">Avg. discount</div><div class="stat-value accent">−${avgDiscount.toFixed(0)}%</div></div>
+    <div class="stat"><div class="stat-label">Avg. deal score</div><div class="stat-value accent">${avgScore.toFixed(1)}</div></div>
     <div class="stat"><div class="stat-label">Best find</div><div class="stat-value" style="font-size:1.05rem">${BRAND_NAME.get(best.l.brand)} ${best.l.modelLabel}</div></div>
   `;
 
   const shown = matches.slice(0, 250);
   for (const m of shown) {
     const l = m.l;
+    const fw = fuelWeightFor(l), mw = mileageWeightFor(l), cw = corrosionMultiplierFor(l);
+    const breakdown = `${m.pctBelow.toFixed(1)}% below avg. × ${fw.toFixed(2)} fuel × ${mw.toFixed(2)} mileage × ${cw.toFixed(2)} corrosion = ${m.dealScore.toFixed(1)}`;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="title-cell"><a href="${l.url}" target="_blank" rel="noopener">${escapeHtml(l.title)}</a><div class="sub">${BRAND_NAME.get(l.brand)} ${escapeHtml(l.modelLabel)} · n=${m.count}</div></td>
@@ -631,13 +817,14 @@ function renderDeals() {
       <td class="num">${fmtKm(l.mileageKm)}</td>
       <td class="num">${fmtEur(l.priceEur)}</td>
       <td class="num sub">${fmtEur(m.avg)}</td>
-      <td class="num"><span class="chip good">−${m.pctBelow.toFixed(0)}%</span></td>
+      <td class="num sub">−${m.pctBelow.toFixed(0)}%</td>
+      <td class="num" title="${breakdown}"><span class="chip good">${m.dealScore.toFixed(1)}</span></td>
     `;
     body.appendChild(tr);
   }
   if (matches.length > 250) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="7" class="sub" style="text-align:center; padding:14px;">Showing top 250 of ${matches.length} matches — narrow with a make or higher threshold to see more precisely.</td>`;
+    tr.innerHTML = `<td colspan="8" class="sub" style="text-align:center; padding:14px;">Showing top 250 of ${matches.length} matches — narrow with a make or higher threshold to see more precisely.</td>`;
     body.appendChild(tr);
   }
 }
