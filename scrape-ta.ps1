@@ -9,11 +9,15 @@ $log = "$dir\scrape_ta_log.txt"
 $results = New-Object System.Collections.Generic.List[object]
 $i = 0
 $ok = 0
-$missing = 0
+$explicitNone = 0
+$unknown = 0
 $failed = 0
 
 foreach ($l in $listings) {
   $i++
+  # taDate: "YYYY-MM" if a date was listed; "none" if the field is present but
+  # explicitly says there's no valid TA (e.g. "Bez apskates"); $null if the
+  # field is simply absent from the ad (seller didn't mention it either way).
   $taDate = $null
   try {
     $r = Invoke-WebRequest -Uri $l.url -UserAgent $ua -UseBasicParsing -TimeoutSec 15
@@ -27,11 +31,14 @@ foreach ($l in $listings) {
       if ($dm.Success) {
         $taDate = "$($dm.Groups[2].Value)-$($dm.Groups[1].Value)"
         $ok++
+      } elseif ($val.Length -gt 0) {
+        $taDate = "none"
+        $explicitNone++
       } else {
-        $missing++
+        $unknown++
       }
     } else {
-      $missing++
+      $unknown++
     }
   } catch {
     $failed++
@@ -39,10 +46,10 @@ foreach ($l in $listings) {
   }
   $results.Add([PSCustomObject]@{ id = $l.id; taDate = $taDate })
   if ($i % 100 -eq 0) {
-    "progress $i/$($listings.Count) ok=$ok missing=$missing failed=$failed" | Out-File $log -Append -Encoding utf8
+    "progress $i/$($listings.Count) ok=$ok explicitNone=$explicitNone unknown=$unknown failed=$failed" | Out-File $log -Append -Encoding utf8
   }
   Start-Sleep -Milliseconds 250
 }
 
 $results | ConvertTo-Json -Compress | Set-Content "$dir\ta.json" -Encoding utf8 -NoNewline
-"DONE total=$($listings.Count) ok=$ok missing=$missing failed=$failed" | Out-File $log -Append -Encoding utf8
+"DONE total=$($listings.Count) ok=$ok explicitNone=$explicitNone unknown=$unknown failed=$failed" | Out-File $log -Append -Encoding utf8

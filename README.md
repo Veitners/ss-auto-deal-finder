@@ -35,7 +35,7 @@ score = %-below-group-average × fuelWeight × mileageWeight × corrosionMultipl
 - **Fuel weight** — flat desirability per fuel type (diesel 0.9, petrol 0.85, hybrid 0.7, electric 0.6, gas 0.75).
 - **Mileage weight** — `1 - rate × (km over threshold) / 100,000`, threshold 150k km for diesel vs 100k for everything else (diesel engines tolerate more distance before it counts against them).
 - **Corrosion multiplier** — flat penalties for known problem model/year combos (Mazda pre-2014, VW Passat B6 both ×0.5).
-- **TA weight** — for cars older than 10 years only, based on remaining technical-inspection validity: piecewise-linear between (36mo→1.0, 24mo→0.95, 12mo→0.9, 1mo→0.4), extrapolated and floored below 1 month (including expired/no TA on record).
+- **TA weight** — for cars older than 10 years only, based on remaining technical-inspection validity: piecewise-linear between (36mo→1.0, 24mo→0.95, 12mo→0.9, 1mo→0.4), extrapolated and floored below 1 month. An ad that explicitly says there's no valid TA (`"Bez apskates"`) is treated as expired now; an ad that simply doesn't mention TA either way falls back to a customizable neutral default (0.8) rather than assuming the worst.
 
 Mileage, corrosion, and TA each have an "importance" slider in the UI (0–100%) that blends between the full formula above and ignoring that factor entirely (100% km is treated the same as 0km when importance is 0%). All raw weight values are also live-adjustable sliders.
 
