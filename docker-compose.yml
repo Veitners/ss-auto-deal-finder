@@ -1,0 +1,15 @@
+services:
+  deal-radar:
+    build: .
+    container_name: deal-radar
+    restart: unless-stopped
+    ports:
+      - "${RADAR_PORT:-8082}:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: "Europe/Riga"
+      # Optional: set a token to allow triggering crawls from the UI/API.
+      # ADMIN_TOKEN: "change-me"
+      # Optional push alerts (https://ntfy.sh style topic URL).
+      # NTFY_URL: "https://ntfy.example.com/deals"

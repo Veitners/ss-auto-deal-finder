@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deal Radar</title>
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand">
+      <span class="eyebrow">SS.LV + PP.LV · LATVIA</span>
+      <h1>Deal Radar</h1>
+    </div>
+    <div class="status" id="status" aria-live="polite">
+      <span class="dot" id="statusDot"></span><span id="statusText">Connecting…</span>
+    </div>
+  </div>
+  <nav class="wrap tabs" id="tabs" role="tablist" aria-label="Category">
+    <button role="tab" data-v="car" aria-selected="true">Cars <span class="count" id="count-car"></span></button>
+    <button role="tab" data-v="flat" aria-selected="false">Flats <span class="count" id="count-flat"></span></button>
+    <button role="tab" data-v="house" aria-selected="false">Houses <span class="count" id="count-house"></span></button>
+  </nav>
+</header>
+
+<main class="wrap layout">
+  <aside class="filters" id="filters" aria-label="Filters">
+    <button class="filters-toggle" id="filtersToggle" aria-expanded="false">Filters &amp; weights</button>
+    <div class="filters-body" id="filtersBody">
+      <section class="panel">
+        <h2>Search</h2>
+        <label class="field"><span>Text</span><input type="search" id="q" placeholder="e.g. golf, centrs, 2-room"></label>
+        <div class="field"><span>Source</span>
+          <div class="seg" id="source" role="group" aria-label="Source">
+            <button data-val="" aria-pressed="true">Both</button>
+            <button data-val="ss" aria-pressed="false">ss.lv</button>
+            <button data-val="pp" aria-pressed="false">pp.lv</button>
+          </div>
+        </div>
+        <label class="field"><span id="regionLabel">Region</span><select id="region"><option value="">All</option></select></label>
+        <div class="field"><span>Price, €</span>
+          <div class="pair"><input type="number" id="price_min" placeholder="min" min="0" inputmode="numeric"><input type="number" id="price_max" placeholder="max" min="0" inputmode="numeric"></div>
+        </div>
+        <div class="only-car">
+          <div class="field"><span>Year</span><div class="pair"><input type="number" id="year_min" placeholder="from" inputmode="numeric"><input type="number" id="year_max" placeholder="to" inputmode="numeric"></div></div>
+          <label class="field"><span>Max mileage, km</span><input type="number" id="km_max" placeholder="e.g. 200000" inputmode="numeric"></label>
+          <div class="field"><span>Fuel</span>
+            <div class="chips" id="fuel">
+              <label><input type="checkbox" value="petrol">Petrol</label>
+              <label><input type="checkbox" value="diesel">Diesel</label>
+              <label><input type="checkbox" value="hybrid">Hybrid</label>
+              <label><input type="checkbox" value="electric">Electric</label>
+              <label><input type="checkbox" value="gas">LPG</label>
+            </div>
+          </div>
+          <label class="field"><span>Gearbox</span><select id="gear"><option value="">Any</option><option value="auto">Automatic</option><option value="manual">Manual</option></select></label>
+        </div>
+        <div class="only-estate">
+          <div class="field only-house"><span>Type</span>
+            <div class="seg" id="kind" role="group" aria-label="House type">
+              <button data-val="" aria-pressed="true">Any</button>
+              <button data-val="house" aria-pressed="false">House</button>
+              <button data-val="cottage" aria-pressed="false">Cottage</button>
+            </div>
+            <small class="fine">Read from the ad’s wording (māja vs vasarnīca); the sites don’t label it.</small>
+          </div>
+          <div class="field"><span>Area, m²</span><div class="pair"><input type="number" id="area_min" placeholder="min" inputmode="numeric"><input type="number" id="area_max" placeholder="max" inputmode="numeric"></div></div>
+          <div class="field"><span>Rooms</span><div class="pair"><input type="number" id="rooms_min" placeholder="min" min="1" inputmode="numeric"><input type="number" id="rooms_max" placeholder="max" min="1" inputmode="numeric"></div></div>
+          <label class="field only-flat"><span>Min. rental yield, %</span><input type="number" id="yield_min" placeholder="e.g. 6" min="0" step="0.5" inputmode="decimal">
+            <small class="fine">Estimated from what comparable flats rent for on both sites. Gross, before costs and vacancy.</small></label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Trust</h2>
+        <label class="field"><span>Minimum confidence <b id="confVal">0%</b></span><input type="range" id="min_conf" min="0" max="0.9" step="0.05" value="0"></label>
+        <label class="check"><input type="checkbox" id="include_too_good"> Show “too good to be true” (&gt;45% below fair)</label>
+        <label class="check"><input type="checkbox" id="include_flagged"> Show ads with damage / defect wording</label>
+      </section>
+
+      <details class="panel weights" id="weights">
+        <summary>Your weights <span class="hint">how fuel, mileage, rust, inspection and signals count</span></summary>
+        <div id="weightsBody"></div>
+        <button class="link" id="resetWeights" type="button">Reset to defaults</button>
+      </details>
+    </div>
+  </aside>
+
+  <section class="results" aria-live="polite">
+    <div class="bar">
+      <div class="summary" id="summary">Loading…</div>
+      <label class="sort"><span>Sort</span>
+        <select id="sort">
+          <option value="score">Best deal</option>
+          <option value="discount">Biggest discount</option>
+          <option value="confidence">Most reliable</option>
+          <option value="yield" id="sortYield">Rental yield (confidence-weighted)</option>
+          <option value="newest">Newest</option>
+          <option value="price">Price, low to high</option>
+        </select>
+      </label>
+    </div>
+    <ol class="list" id="list"></ol>
+    <div class="more" id="more" hidden><button id="moreBtn" type="button">Show more</button></div>
+    <div class="empty" id="empty" hidden></div>
+  </section>
+</main>
+
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Listing details">
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true">
+    <button class="close" id="closeDrawer" aria-label="Close">×</button>
+    <div id="sheetBody"></div>
+  </div>
+</aside>
+
+<footer class="wrap foot">
+  Asking prices from public ss.lv and pp.lv listings, not sale prices. Fair value is a statistical estimate from comparable
+  listings and says nothing about condition. Always inspect before paying.
+</footer>
+
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
